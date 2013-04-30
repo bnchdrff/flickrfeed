@@ -74,7 +74,7 @@ function flickrfeed_theme() {
  * @param string $tags
  *   flickr tags, comma-separated
  * @param int $num
- *   number of photos to return
+ *   maximum number of photos to return
  *
  * @return
  *   html string of flickr feed
@@ -90,9 +90,11 @@ function _flickrfeed_flickrusertagphotos($nsid, $tags, $num) {
   $photos = array();
 
   for ($i=0; $i < $num; $i++) {
-    $photos[$i] = $res['photo'][$i];
-    // add a handy url item
-    $photos[$i]['url'] = 'http://www.flickr.com/photos/' . $photos[$i]['owner'] . '/' . $photos[$i]['id'];
+    if (count($res['photo'][$i])) {
+      $photos[$i] = $res['photo'][$i];
+      // add a handy url item
+      $photos[$i]['url'] = 'http://www.flickr.com/photos/' . $photos[$i]['owner'] . '/' . $photos[$i]['id'];
+    }
   }
 
   return $photos;
