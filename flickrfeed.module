@@ -84,16 +84,21 @@ function _flickrfeed_flickrusertagphotos($nsid, $tags, $num) {
   $res = $flickr->photos_search(array(
     'user_id' => $nsid,
     'tags' => $tags,
-    'extras' => 'url_t',
+    'extras' => 'url_t,url_s,url_sq,url_q',
   ));
 
-  $photos = array();
+  // fail quickly if needed
+  if (!count($res['photo'])) { return; }
 
+  // load photos
+  $photos = array();
   for ($i=0; $i < $num; $i++) {
     if (count($res['photo'][$i])) {
       $photos[$i] = $res['photo'][$i];
       // add a handy url item
       $photos[$i]['url'] = 'http://www.flickr.com/photos/' . $photos[$i]['owner'] . '/' . $photos[$i]['id'];
+      // add the queried tags
+      $photos[$i]['queried_tags'] = $tags;
     }
   }
 
