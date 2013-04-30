@@ -1,0 +1,5 @@
+name = Flickrfeed
+description = Provides flickr user/tag image feeds as tokens
+core = 7.x
+package = Work Dept
+dependencies[] = flickrapi

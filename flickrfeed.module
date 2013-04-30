@@ -1,0 +1,100 @@
+<?php
+
+/**
+ * Implements hook_token_info().
+ *
+ * Adds a flickr feed token to be used in event node body.
+ */
+function flickrfeed_token_info() {
+  $type = array(
+    'name' => t('Flickr feeds'),
+    'description' => t('Tokens related to flickr feeds.'),
+  );
+
+  $flickrfeed['usertag'] = array(
+    'name' => t('Photos from user with tag'),
+    'description' => t('Display Flickr photos from a user with a tag.'),
+    'dynamic' => TRUE,
+  );
+
+  return array(
+    'types' => array('flickrfeed' => $type),
+    'tokens' => array(
+      'flickrfeed' => $flickrfeed,
+    ),
+  );
+}
+
+/**
+ * Implements hook_tokens().
+ *
+ * Produce a feed of photos from a user and tag based on token with format:
+ *   [flickrfeed:usertag:?:?]
+ */
+function flickrfeed_tokens($type, $tokens, array $data = array(), array $options = array()) {
+  $replacements = array();
+  $sanitize = !empty($options['sanitize']);
+
+  if ($type == 'flickrfeed') {
+    foreach ($tokens as $name => $original) {
+      list($type, $user, $tags) = explode(':', $name);
+      switch ($type) {
+        case 'usertag':
+          $user = flickrapi_get_user_nsid($user);
+          if ($user && $tags) {
+            $photos = _flickrfeed_flickrusertagphotos($user, $tags, 5);
+            $replacements[$original] = theme('flickrfeed', array('photos' => $photos));
+          }
+          break;
+      }
+    }
+  }
+
+  return $replacements;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function flickrfeed_theme() {
+  return array(
+    'flickrfeed' => array(
+      'template' => 'flickrfeed',
+      'variables' => array('photos' => null),
+    ),
+  );
+}
+
+
+/**
+ * Queries flickr api and gets images from a user with a certain tag.
+ *
+ * @param string $nsid
+ *   flickr user NSID
+ * @param string $tags
+ *   flickr tags, comma-separated
+ * @param int $num
+ *   number of photos to return
+ *
+ * @return
+ *   html string of flickr feed
+ */
+function _flickrfeed_flickrusertagphotos($nsid, $tags, $num) {
+  $flickr = flickrapi_phpFlickr();
+  $res = $flickr->photos_search(array(
+    'user_id' => $nsid,
+    'tags' => $tags,
+    'extras' => 'url_t',
+  ));
+
+  $photos = array();
+
+  for ($i=0; $i < $num; $i++) {
+    $photos[$i] = $res['photo'][$i];
+    // add a handy url item
+    $photos[$i]['url'] = 'http://www.flickr.com/photos/' . $photos[$i]['owner'] . '/' . $photos[$i]['id'];
+  }
+
+  return $photos;
+}
+
