@@ -10,7 +10,7 @@ The token looks like this:
 
         [flickrfeed:usertag:95221224@N04:rundunainrouge]
 
-The user ID part can be the Flickr NSID or the display name. The tag part can have one or many comma-separated tags. Both ar mandatory.
+The user ID part can be the Flickr NSID or the display name. The tag part can have one or many comma-separated tags. Both are mandatory.
 
 The output is themed by flickrfeed.tpl.php.
 
