@@ -3,7 +3,7 @@
 /**
  * Implements hook_token_info().
  *
- * Adds a flickr feed token to be used in event node body.
+ * Adds a flickr feed token
  */
 function flickrfeed_token_info() {
   $type = array(
@@ -13,7 +13,13 @@ function flickrfeed_token_info() {
 
   $flickrfeed['usertag'] = array(
     'name' => t('Photos from user with tag'),
-    'description' => t('Display Flickr photos from a user with a tag.'),
+    'description' => t('Display Flickr photos from a user with optional comma-separated tags.'),
+    'dynamic' => TRUE,
+  );
+
+  $flickrfeed['set'] = array(
+    'name' => t('Photos from a photoset'),
+    'description' => t('Display Flickr photos from a photoset.'),
     'dynamic' => TRUE,
   );
 
@@ -29,7 +35,8 @@ function flickrfeed_token_info() {
  * Implements hook_tokens().
  *
  * Produce a feed of photos from a user and tag based on token with format:
- *   [flickrfeed:usertag:?:?]
+ *   [flickrfeed:op:arg0:arg1]
+ * "op" is either usertag or set
  */
 function flickrfeed_tokens($type, $tokens, array $data = array(), array $options = array()) {
   $replacements = array();
@@ -37,15 +44,22 @@ function flickrfeed_tokens($type, $tokens, array $data = array(), array $options
 
   if ($type == 'flickrfeed') {
     foreach ($tokens as $name => $original) {
-      list($type, $user, $tags) = explode(':', $name);
-      switch ($type) {
+      list($op, $arg_0, $arg_1) = explode(':', $name);
+      switch ($op) {
         case 'usertag':
-          $user = flickrapi_get_user_nsid($user);
-          if ($user && $tags) {
+          $user = flickrapi_get_user_nsid($arg_0);
+          $tags = (isset($arg_1)) ? $arg_1 : FALSE;
+          if ($user) {
             $photos = _flickrfeed_flickrusertagphotos($user, $tags, 5);
             $replacements[$original] = theme('flickrfeed', array('photos' => $photos));
           }
           break;
+        case 'set':
+          $photoset_id = $arg_0;
+          if ($photoset_id) {
+            $photos = _flickrfeed_flickrphotosetsphotos($photoset_id, 5);
+            $replacements[$original] = theme('flickrfeed', array('photos' => $photos));
+          }
       }
     }
   }
@@ -73,6 +87,7 @@ function flickrfeed_theme() {
  *   flickr user NSID
  * @param string $tags
  *   flickr tags, comma-separated
+ *   if FALSE, display user's full photostream
  * @param int $num
  *   maximum number of photos to return
  *
@@ -81,11 +96,19 @@ function flickrfeed_theme() {
  */
 function _flickrfeed_flickrusertagphotos($nsid, $tags, $num) {
   $flickr = flickrapi_phpFlickr();
-  $res = $flickr->photos_search(array(
-    'user_id' => $nsid,
-    'tags' => $tags,
-    'extras' => 'url_t,url_s,url_sq,url_q',
-  ));
+  if ($tags) {
+    $res = $flickr->photos_search(array(
+      'user_id' => $nsid,
+      'tags' => $tags,
+      'extras' => 'url_t,url_s,url_sq,url_q',
+    ));
+  }
+  else {
+    $res = $flickr->photos_search(array(
+      'user_id' => $nsid,
+      'extras' => 'url_t,url_s,url_sq,url_q',
+    ));
+  }
 
   // fail quickly if needed
   if (!count($res['photo'])) { return; }
@@ -99,6 +122,42 @@ function _flickrfeed_flickrusertagphotos($nsid, $tags, $num) {
       $photos[$i]['url'] = 'http://www.flickr.com/photos/' . $photos[$i]['owner'] . '/' . $photos[$i]['id'];
       // add the queried tags
       $photos[$i]['queried_tags'] = $tags;
+    }
+  }
+
+  return $photos;
+}
+
+/**
+ * Queries flickr api and gets images from a photoset.
+ *
+ * @param int $photoset_id
+ *   flickr photoset id
+ * @param int $num
+ *   maximum number of photos to return
+ *
+ * @return
+ *   array of photos with metadata
+ */
+function _flickrfeed_flickrphotosetsphotos($photoset_id, $num) {
+  $flickr = flickrapi_phpFlickr();
+  $res = $flickr->photosets_getPhotos(array(
+    'photoset_id' => $photoset_id,
+    'extras' => 'url_t,url_s,url_sq,url_q',
+  ));
+
+  // fail quickly if needed
+  if (!count($res['photo'])) { return; }
+
+  // load photos
+  $photos = array();
+  for ($i=0; $i < $num; $i++) {
+    if (count($res['photo'][$i])) {
+      $photos[$i] = $res['photo'][$i];
+      // add a handy url item
+      $photos[$i]['url'] = 'http://www.flickr.com/photos/' . $photos[$i]['owner'] . '/' . $photos[$i]['id'];
+      // add the queried set ID
+      $photos[$i]['photoset_id'] = $photoset_id;
     }
   }
 
