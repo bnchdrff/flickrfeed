@@ -1,6 +1,11 @@
 <?php
 
 /**
+ * Flickr API constants
+ */
+define('FLICKR_SIZES', 'url_sq,url_t,url_s,url_q,url_m,url_n,url_z,url_c,url_l,url_o');
+
+/**
  * Implements hook_token_info().
  *
  * Adds a flickr feed token
@@ -35,8 +40,10 @@ function flickrfeed_token_info() {
  * Implements hook_tokens().
  *
  * Produce a feed of photos from a user and tag based on token with format:
- *   [flickrfeed:op:arg0:arg1]
+ *   [flickrfeed:op:num:size:arg0:arg1]
  * "op" is either usertag or set
+ * "num" is number of images to return
+ * "size" is flickr api size to return, see http://www.flickr.com/services/api/flickr.photos.search.html#yui_3_7_3_1_1372273478019_420
  */
 function flickrfeed_tokens($type, $tokens, array $data = array(), array $options = array()) {
   $replacements = array();
@@ -44,20 +51,20 @@ function flickrfeed_tokens($type, $tokens, array $data = array(), array $options
 
   if ($type == 'flickrfeed') {
     foreach ($tokens as $name => $original) {
-      list($op, $arg_0, $arg_1) = explode(':', $name);
+      list($op, $num, $size, $arg_0, $arg_1) = explode(':', $name);
       switch ($op) {
         case 'usertag':
           $user = flickrapi_get_user_nsid($arg_0);
           $tags = (isset($arg_1)) ? $arg_1 : FALSE;
           if ($user) {
-            $photos = _flickrfeed_flickrusertagphotos($user, $tags, 5);
+            $photos = _flickrfeed_flickrusertagphotos($user, $tags, $num, $size);
             $replacements[$original] = theme('flickrfeed', array('photos' => $photos));
           }
           break;
         case 'set':
           $photoset_id = $arg_0;
           if ($photoset_id) {
-            $photos = _flickrfeed_flickrphotosetsphotos($photoset_id, 5);
+            $photos = _flickrfeed_flickrphotosetsphotos($photoset_id, $num, $size);
             $replacements[$original] = theme('flickrfeed', array('photos' => $photos));
           }
       }
@@ -90,23 +97,25 @@ function flickrfeed_theme() {
  *   if FALSE, display user's full photostream
  * @param int $num
  *   maximum number of photos to return
+ * @param string $size
+ *   flickr api image size to output as default
  *
  * @return
  *   html string of flickr feed
  */
-function _flickrfeed_flickrusertagphotos($nsid, $tags, $num) {
+function _flickrfeed_flickrusertagphotos($nsid, $tags, $num, $size) {
   $flickr = flickrapi_phpFlickr();
   if ($tags) {
     $res = $flickr->photos_search(array(
       'user_id' => $nsid,
       'tags' => $tags,
-      'extras' => 'url_t,url_s,url_sq,url_q',
+      'extras' => FLICKR_SIZES,
     ));
   }
   else {
     $res = $flickr->photos_search(array(
       'user_id' => $nsid,
-      'extras' => 'url_t,url_s,url_sq,url_q',
+      'extras' => FLICKR_SIZES,
     ));
   }
 
@@ -122,6 +131,8 @@ function _flickrfeed_flickrusertagphotos($nsid, $tags, $num) {
       $photos[$i]['url'] = 'http://www.flickr.com/photos/' . $photos[$i]['owner'] . '/' . $photos[$i]['id'];
       // add the queried tags
       $photos[$i]['queried_tags'] = $tags;
+      // provide default size for use in template
+      $photos[$i]['default_size'] = $size;
     }
   }
 
@@ -135,15 +146,17 @@ function _flickrfeed_flickrusertagphotos($nsid, $tags, $num) {
  *   flickr photoset id
  * @param int $num
  *   maximum number of photos to return
+ * @param string $size
+ *   flickr api image size to output as default
  *
  * @return
  *   array of photos with metadata
  */
-function _flickrfeed_flickrphotosetsphotos($photoset_id, $num) {
+function _flickrfeed_flickrphotosetsphotos($photoset_id, $num, $size) {
   $flickr = flickrapi_phpFlickr();
   $res = $flickr->photosets_getPhotos(array(
     'photoset_id' => $photoset_id,
-    'extras' => 'url_t,url_s,url_sq,url_q',
+    'extras' => FLICKR_SIZES,
   ));
 
   // fail quickly if needed
@@ -158,6 +171,8 @@ function _flickrfeed_flickrphotosetsphotos($photoset_id, $num) {
       $photos[$i]['url'] = 'http://www.flickr.com/photos/' . $photos[$i]['owner'] . '/' . $photos[$i]['id'];
       // add the queried set ID
       $photos[$i]['photoset_id'] = $photoset_id;
+      // provide default size for use in template
+      $photos[$i]['default_size'] = $size;
     }
   }
 
